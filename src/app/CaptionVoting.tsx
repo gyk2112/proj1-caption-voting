@@ -22,7 +22,7 @@ export default function CaptionVoting({ initialCaptions }: { initialCaptions: Ca
   const [error, setError] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
 
-  const handleVote = async (captionId: string, vote: 1 | -1, advance: boolean) => {
+  const handleVote = async (captionId: string, vote: 1 | -1) => {
     if (loading) return
     setLoading(captionId)
     setError(null)
@@ -42,16 +42,11 @@ export default function CaptionVoting({ initialCaptions }: { initialCaptions: Ca
       setCaptions(prev =>
         prev.map(c => {
           if (c.id !== captionId) return c
-          const prevVote = voted[captionId] ?? 0
-          const delta = vote - prevVote
-          return { ...c, like_count: (c.like_count ?? 0) + delta }
+          return { ...c, like_count: (c.like_count ?? 0) + vote }
         })
       )
       setVoted(prev => ({ ...prev, [captionId]: vote }))
-
-      if (advance) {
-        setIndex(i => Math.min(i + 1, captions.length))
-      }
+      setIndex(i => Math.min(i + 1, captions.length))
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -131,15 +126,7 @@ export default function CaptionVoting({ initialCaptions }: { initialCaptions: Ca
       {/* Buttons */}
       <div className="flex gap-3">
         <button
-          onClick={() => setIndex(i => Math.max(i - 1, 0))}
-          disabled={index === 0 || isLoading}
-          className="flex-1 py-3 border border-[#333] text-[#666] text-xs tracking-widest uppercase hover:border-[#555] hover:text-[#aaa] transition-all disabled:opacity-20"
-        >
-          ← Back
-        </button>
-
-        <button
-          onClick={() => handleVote(caption.id, 1, true)}
+          onClick={() => handleVote(caption.id, 1)}
           disabled={isLoading}
           className={`flex-1 py-3 border text-xs tracking-widest uppercase transition-all duration-150 ${
             userVote === 1
@@ -151,7 +138,7 @@ export default function CaptionVoting({ initialCaptions }: { initialCaptions: Ca
         </button>
 
         <button
-          onClick={() => handleVote(caption.id, -1, true)}
+          onClick={() => handleVote(caption.id, -1)}
           disabled={isLoading}
           className={`flex-1 py-3 border text-xs tracking-widest uppercase transition-all duration-150 ${
             userVote === -1
