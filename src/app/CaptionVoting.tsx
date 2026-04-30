@@ -20,8 +20,9 @@ export default function CaptionVoting({ initialCaptions }: { initialCaptions: Ca
   const [voted, setVoted] = useState<Record<string, 1 | -1>>({})
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [index, setIndex] = useState(0)
 
-  const handleVote = async (captionId: string, vote: 1 | -1) => {
+  const handleVote = async (captionId: string, vote: 1 | -1, advance: boolean) => {
     if (loading) return
     setLoading(captionId)
     setError(null)
@@ -38,16 +39,19 @@ export default function CaptionVoting({ initialCaptions }: { initialCaptions: Ca
         throw new Error(body.error ?? 'Vote failed')
       }
 
-      // Optimistically update the displayed like_count
       setCaptions(prev =>
         prev.map(c => {
           if (c.id !== captionId) return c
-          const prev_vote = voted[captionId] ?? 0
-          const delta = vote - prev_vote
+          const prevVote = voted[captionId] ?? 0
+          const delta = vote - prevVote
           return { ...c, like_count: (c.like_count ?? 0) + delta }
         })
       )
       setVoted(prev => ({ ...prev, [captionId]: vote }))
+
+      if (advance) {
+        setIndex(i => Math.min(i + 1, captions.length))
+      }
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -56,91 +60,108 @@ export default function CaptionVoting({ initialCaptions }: { initialCaptions: Ca
   }
 
   if (captions.length === 0) {
+    return <div className="text-[#444] text-sm">No captions found.</div>
+  }
+
+  if (index >= captions.length) {
     return (
-      <div className="text-[#444] text-sm">No captions found.</div>
+      <div className="flex flex-col items-center justify-center gap-6 py-20">
+        <p className="text-[#888] text-sm tracking-widest uppercase">All done</p>
+        <button
+          onClick={() => setIndex(captions.length - 1)}
+          className="border border-[#333] text-[#666] px-5 py-2 text-xs tracking-widest uppercase hover:border-[#555] hover:text-[#aaa] transition-all"
+        >
+          ← Go Back
+        </button>
+      </div>
     )
   }
 
+  const caption = captions[index]
+  const imageUrl = getImageUrl(caption.images)
+  const userVote = voted[caption.id]
+  const isLoading = loading === caption.id
+
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
       {error && (
         <div className="border border-red-900 bg-red-950/30 p-3 text-red-400 text-xs">{error}</div>
       )}
 
-      {captions.map(caption => {
-        const userVote = voted[caption.id]
-        const isLoading = loading === caption.id
+      {/* Progress */}
+      <div className="flex justify-between items-center text-[10px] text-[#444] tracking-widest uppercase">
+        <span>{index + 1} / {captions.length}</span>
+        {userVote && !isLoading && (
+          <span className={userVote === 1 ? 'text-green-500' : 'text-red-500'}>
+            {userVote === 1 ? '▲ Upvoted' : '▼ Downvoted'}
+          </span>
+        )}
+        {isLoading && <span>Saving…</span>}
+      </div>
 
-        return (
-          <div key={caption.id} className="border border-[#1e1e1e] bg-[#111] p-5 flex gap-5">
-            {/* Image */}
-            {getImageUrl(caption.images) ? (
-              <img
-                src={getImageUrl(caption.images)!}
-                alt=""
-                className="w-32 h-32 object-cover flex-shrink-0 opacity-90"
-              />
-            ) : (
-              <div className="w-32 h-32 bg-[#1a1a1a] flex-shrink-0 flex items-center justify-center">
-                <span className="text-[#333] text-[10px] tracking-widest uppercase">No image</span>
-              </div>
-            )}
+      {/* Image */}
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="w-full aspect-[4/3] object-cover opacity-95"
+        />
+      ) : (
+        <div className="w-full aspect-[4/3] bg-[#1a1a1a] flex items-center justify-center">
+          <span className="text-[#333] text-[10px] tracking-widest uppercase">No image</span>
+        </div>
+      )}
 
-            {/* Caption content + voting */}
-            <div className="flex-1 min-w-0 flex flex-col justify-between">
-              <p className="text-sm text-white leading-relaxed">{caption.content}</p>
+      {/* Caption */}
+      <p className="text-white text-base leading-relaxed">{caption.content}</p>
 
-              <div className="flex items-center gap-4 mt-4">
-                {/* Upvote */}
-                <button
-                  onClick={() => handleVote(caption.id, 1)}
-                  disabled={isLoading}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 border text-xs tracking-widest uppercase transition-all duration-150 ${
-                    userVote === 1
-                      ? 'border-green-500 bg-green-500/10 text-green-400'
-                      : 'border-[#333] text-[#666] hover:border-green-500 hover:text-green-400'
-                  } disabled:opacity-40`}
-                >
-                  <span>▲</span>
-                  <span>Up</span>
-                </button>
+      {/* Score */}
+      <div className="text-center">
+        <span className={`text-2xl font-bold tabular-nums ${
+          (caption.like_count ?? 0) > 0
+            ? 'text-green-400'
+            : (caption.like_count ?? 0) < 0
+            ? 'text-red-400'
+            : 'text-[#444]'
+        }`}>
+          {caption.like_count ?? 0}
+        </span>
+      </div>
 
-                {/* Score */}
-                <span className={`text-sm tabular-nums font-bold w-8 text-center ${
-                  (caption.like_count ?? 0) > 0
-                    ? 'text-green-400'
-                    : (caption.like_count ?? 0) < 0
-                    ? 'text-red-400'
-                    : 'text-[#444]'
-                }`}>
-                  {caption.like_count ?? 0}
-                </span>
+      {/* Buttons */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => setIndex(i => Math.max(i - 1, 0))}
+          disabled={index === 0 || isLoading}
+          className="flex-1 py-3 border border-[#333] text-[#666] text-xs tracking-widest uppercase hover:border-[#555] hover:text-[#aaa] transition-all disabled:opacity-20"
+        >
+          ← Back
+        </button>
 
-                {/* Downvote */}
-                <button
-                  onClick={() => handleVote(caption.id, -1)}
-                  disabled={isLoading}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 border text-xs tracking-widest uppercase transition-all duration-150 ${
-                    userVote === -1
-                      ? 'border-red-500 bg-red-500/10 text-red-400'
-                      : 'border-[#333] text-[#666] hover:border-red-500 hover:text-red-400'
-                  } disabled:opacity-40`}
-                >
-                  <span>▼</span>
-                  <span>Down</span>
-                </button>
+        <button
+          onClick={() => handleVote(caption.id, 1, true)}
+          disabled={isLoading}
+          className={`flex-1 py-3 border text-xs tracking-widest uppercase transition-all duration-150 ${
+            userVote === 1
+              ? 'border-green-500 bg-green-500/10 text-green-400'
+              : 'border-[#333] text-[#666] hover:border-green-500 hover:text-green-400'
+          } disabled:opacity-40`}
+        >
+          ▲ Upvote
+        </button>
 
-                {isLoading && (
-                  <span className="text-[10px] text-[#444] tracking-widest uppercase">Saving…</span>
-                )}
-                {userVote && !isLoading && (
-                  <span className="text-[10px] text-[#444] tracking-widest uppercase">Voted</span>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      })}
+        <button
+          onClick={() => handleVote(caption.id, -1, true)}
+          disabled={isLoading}
+          className={`flex-1 py-3 border text-xs tracking-widest uppercase transition-all duration-150 ${
+            userVote === -1
+              ? 'border-red-500 bg-red-500/10 text-red-400'
+              : 'border-[#333] text-[#666] hover:border-red-500 hover:text-red-400'
+          } disabled:opacity-40`}
+        >
+          ▼ Downvote
+        </button>
+      </div>
     </div>
   )
 }
