@@ -15,12 +15,21 @@ function getImageUrl(images: Caption['images']): string | null {
   return images.url ?? null
 }
 
-export default function CaptionVoting({ initialCaptions }: { initialCaptions: Caption[] }) {
+export default function CaptionVoting({
+  initialCaptions,
+  initialVoted = {},
+}: {
+  initialCaptions: Caption[]
+  initialVoted?: Record<string, 1 | -1>
+}) {
   const [captions, setCaptions] = useState(initialCaptions)
-  const [voted, setVoted] = useState<Record<string, 1 | -1>>({})
+  const [voted, setVoted] = useState<Record<string, 1 | -1>>(initialVoted)
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [index, setIndex] = useState(0)
+  const [index, setIndex] = useState(() => {
+    const first = initialCaptions.findIndex(c => !(c.id in initialVoted))
+    return first === -1 ? initialCaptions.length : first
+  })
 
   const handleVote = async (captionId: string, vote: 1 | -1) => {
     if (loading) return

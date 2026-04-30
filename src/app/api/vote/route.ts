@@ -28,11 +28,10 @@ export async function POST(request: Request) {
 
   const { error } = await supabase
     .from('caption_votes')
-    .insert({
-      caption_id,
-      profile_id: user.id,
-      vote_value: vote,
-    })
+    .upsert(
+      { caption_id, profile_id: user.id, vote_value: vote },
+      { onConflict: 'profile_id,caption_id' }
+    )
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
